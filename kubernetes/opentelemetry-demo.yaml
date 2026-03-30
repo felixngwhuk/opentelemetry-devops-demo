@@ -19269,6 +19269,8 @@ spec:
               value: cumulative
             - name: ENVOY_PORT
               value: "8080"
+            - name: ENVOY_ADDR
+              value: 0.0.0.0
             - name: ENVOY_ADMIN_PORT
               value: "10000"
             - name: FLAGD_HOST
@@ -19723,6 +19725,8 @@ spec:
               value: "8013"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://$(OTEL_COLLECTOR_NAME):4317
+            - name: DB_CONNECTION_STRING
+              value: postgres://otelu:otelp@postgresql/otel?sslmode=disable
             - name: GOMEMLIMIT
               value: 16MiB
             - name: OTEL_RESOURCE_ATTRIBUTES
