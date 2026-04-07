@@ -1,3 +1,5 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
 name: Deploy Dev
 
 on:
@@ -58,4 +60,3 @@ jobs:
             echo 'Build and Quality Checks failed ✗'
             exit 1
           fi
-    

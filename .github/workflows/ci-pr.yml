@@ -1,3 +1,5 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
 name: PR Checks
 
 on:
@@ -43,4 +45,3 @@ jobs:
             echo 'Test Build and Quality Checks failed ✗'
             exit 1
           fi
-    
