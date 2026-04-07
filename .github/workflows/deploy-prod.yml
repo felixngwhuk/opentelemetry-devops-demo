@@ -1,0 +1,91 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+name: Deploy Production
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build_preparation:
+    outputs:
+      rc_tag: ${{ steps.set_image_vars.outputs.rc_tag }}
+      release_tag: ${{ steps.set_image_vars.outputs.release_tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version tag format
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $GITHUB_REF_NAME"
+            exit 1
+          fi
+      - name: Read patch number
+        shell: bash
+        run: |
+          VERSION_PATCH_NUMBER="$(tr -d '[:space:]' < VERSION_PATCH_NUMBER)"
+          if [[ ! "$VERSION_PATCH_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid VERSION_PATCH_NUMBER: $VERSION_PATCH_NUMBER"
+            exit 1
+          fi
+          echo "VERSION_PATCH_NUMBER=$VERSION_PATCH_NUMBER" >> "$GITHUB_ENV"
+      - name: Validate release patch number
+        shell: bash
+        run: |
+          RELEASE_PATCH_NUMBER="${GITHUB_REF_NAME##*.}"
+          if [[ "$RELEASE_PATCH_NUMBER" != "$VERSION_PATCH_NUMBER" ]]; then
+            echo "Release tag patch number ($RELEASE_PATCH_NUMBER) does not match VERSION_PATCH_NUMBER ($VERSION_PATCH_NUMBER)"
+            exit 1
+          fi
+      - name: Set image variables
+        id: set_image_vars
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          RC_TAG="${VERSION}-rc-${SHORT_SHA}"
+          RELEASE_TAG="${VERSION}"
+
+          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+  build_images:
+    needs: build_preparation
+    permissions:  # required by the reusable workflow
+      contents: read
+      packages: write
+    uses: ./.github/workflows/component-build-images.yml
+    with:
+      promoted_from_version: ${{ needs.build_preparation.outputs.rc_tag }}
+      version: ${{ needs.build_preparation.outputs.release_tag }}
+      push: true
+    secrets: inherit
+
+  quality_checks:
+    uses: ./.github/workflows/quality-checks.yml
+
+  build-test:
+    needs: [
+      build_images,
+      quality_checks
+    ]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report CI status
+        shell: bash
+        env:
+          CI_SUCCESS: ${{ !contains(needs.*.result, 'failure') }}
+        run: |
+          if [ "${CI_SUCCESS}" == "true" ]
+          then
+            echo 'Build and Quality Checks completed ✓'
+          else
+            echo 'Build and Quality Checks failed ✗'
+            exit 1
+          fi

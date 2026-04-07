@@ -14,6 +14,11 @@ on:
         default: 'dev'
         required: false
         type: string
+      promoted_from_version:
+        description: Existing image tag to promote instead of rebuilding
+        default: ''
+        required: false
+        type: string
 #      dockerhub_repo:
 #        description: Docker Hub repository
 #        default: 'otel/demo'
@@ -204,8 +209,30 @@ jobs:
           buildkitd-config-inline: |
             [worker.oci]
             max-parallelism = 2
+      - name: Check for promoted image
+        if: ${{ steps.check_changes.outputs.skip == 'false' && inputs.push && inputs.promoted_from_version != '' }}
+        id: check_promoted_image
+        shell: bash
+        run: |
+          IMAGE_REF="${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}:${{ inputs.promoted_from_version }}"
+          if docker buildx imagetools inspect "$IMAGE_REF" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Found promoted image: $IMAGE_REF"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "Promoted image not found: $IMAGE_REF"
+          fi
+      - name: Promote existing image
+        if: ${{ steps.check_changes.outputs.skip == 'false' && inputs.push && steps.check_promoted_image.outputs.exists == 'true' }}
+        shell: bash
+        run: |
+          SOURCE_IMAGE="${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}:${{ inputs.promoted_from_version }}"
+          TARGET_IMAGE="${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}:${{ inputs.version }}"
+          docker buildx imagetools create \
+            --tag "$TARGET_IMAGE" \
+            "$SOURCE_IMAGE"
       - name: Matrix Build and push demo images
-        if: steps.check_changes.outputs.skip == 'false'
+        if: ${{ steps.check_changes.outputs.skip == 'false' && (inputs.promoted_from_version == '' || steps.check_promoted_image.outputs.exists != 'true') }}
         id: build_image
         uses: docker/build-push-action@v7.0.0
         with:
