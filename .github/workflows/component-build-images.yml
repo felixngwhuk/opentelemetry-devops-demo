@@ -185,7 +185,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-#        if: ${{ inputs.push }}
+        if: ${{ inputs.push }}
 
 #      - name: Log in to Docker Hub
 #        uses: docker/login-action@v4
@@ -205,7 +205,8 @@ jobs:
             [worker.oci]
             max-parallelism = 2
       - name: Matrix Build and push demo images
-#        if: steps.check_changes.outputs.skip == 'false'
+        if: steps.check_changes.outputs.skip == 'false'
+        id: build_image
         uses: docker/build-push-action@v7.0.0
         with:
           context: ${{ matrix.file_tag.context }}
@@ -219,7 +220,6 @@ jobs:
             OPENSEARCH_IMAGE=${{ env.OPENSEARCH_IMAGE }}
           tags: |
             ${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}:${{ inputs.version }}
-            ${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}:latest
 #          tags: |
 #            ${{ inputs.dockerhub_repo }}:${{ inputs.version }}-${{matrix.file_tag.tag_suffix }}
 #            ${{ inputs.dockerhub_repo }}:latest-${{matrix.file_tag.tag_suffix }}
@@ -227,3 +227,10 @@ jobs:
 #            ${{ inputs.ghcr_repo }}:latest-${{ matrix.file_tag.tag_suffix }}
           cache-from: type=gha
           cache-to: type=gha
+      - name: Push latest images
+        if: ${{ steps.check_changes.outputs.skip == 'false' && inputs.push && startsWith(inputs.version, 'dev-') }}
+        shell: bash
+        run: |
+          docker buildx imagetools create \
+            --tag "${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}:latest" \
+            "${{ inputs.ghcr_repo }}/${{ matrix.file_tag.image_name }}@${{ steps.build_image.outputs.digest }}"
