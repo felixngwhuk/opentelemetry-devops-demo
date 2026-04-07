@@ -1,0 +1,46 @@
+name: PR Checks
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test_build_images:
+    permissions:  # required by the reusable workflow
+      contents: read
+      packages: write
+    uses: ./.github/workflows/component-build-images.yml
+    with:
+      push: false
+    secrets: inherit
+
+  quality_checks:
+    uses: ./.github/workflows/quality-checks.yml
+
+  build-test:
+    needs: [
+      test_build_images,
+      quality_checks
+    ]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report CI status
+        shell: bash
+        env:
+          CI_SUCCESS: ${{ !contains(needs.*.result, 'failure') }}
+        run: |
+          if [ "${CI_SUCCESS}" == "true" ]
+          then
+            echo 'Test Build and Quality Checks complete ✓'
+          else
+            echo 'Test Build and Quality Checks failed ✗'
+            exit 1
+          fi
+    

@@ -1,0 +1,68 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+name: Quality Checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check out code
+        uses: actions/checkout@v6.0.2
+      - name: install dependencies
+        run: npm install
+      - name: run markdownlint
+        run: make markdownlint
+
+  yamllint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check out code
+        uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: install yamllint
+        run: make install-yamllint
+      - name: run yamllint
+        run: yamllint . -f github
+
+  misspell:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check out code
+        uses: actions/checkout@v6.0.2
+      - name: run misspell
+        run: make misspell
+
+  checklinks:
+    name: linkspector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Run linkspector
+        uses: umbrelladocs/action-linkspector@v1
+        with:
+          level: info
+          fail_level: any
+          config_file: '.linkspector.yml'
+
+  sanity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: run sanitycheck.py
+        run: python3 ./internal/tools/sanitycheck.py
+
+  checklicense:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check out code
+        uses: actions/checkout@v6.0.2
+      - name: run checklicense
+        run: make checklicense
