@@ -1,0 +1,85 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - 'version/*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build_preparation:
+    outputs:
+      dev_tag: ${{ steps.set_image_vars.outputs.dev_tag }}
+      rc_tag: ${{ steps.set_image_vars.outputs.rc_tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release branch format
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^version/[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release branch name: $GITHUB_REF_NAME"
+            exit 1
+          fi
+      - name: Read patch number
+        shell: bash
+        run: |
+          VERSION_PATCH_NUMBER="$(tr -d '[:space:]' < VERSION_PATCH_NUMBER)"
+          if [[ ! "$VERSION_PATCH_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Invalid VERSION_PATCH_NUMBER: $VERSION_PATCH_NUMBER"
+            exit 1
+          fi
+          echo "VERSION_PATCH_NUMBER=$VERSION_PATCH_NUMBER" >> "$GITHUB_ENV"
+      - name: Set image variables
+        id: set_image_vars
+        shell: bash
+        run: |
+          MAJOR_MINOR="${GITHUB_REF_NAME#version/}"
+          VERSION="${MAJOR_MINOR}.${VERSION_PATCH_NUMBER}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DEV_TAG="dev-${SHORT_SHA}"
+          RC_TAG="${VERSION}-rc-${SHORT_SHA}"
+
+          echo "dev_tag=$DEV_TAG" >> "$GITHUB_OUTPUT"
+          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+
+  build_images:
+    needs: build_preparation
+    permissions:  # required by the reusable workflow
+      contents: read
+      packages: write
+    uses: ./.github/workflows/component-build-images.yml
+    with:
+      promoted_from_version: ${{ needs.build_preparation.outputs.dev_tag }}
+      version: ${{ needs.build_preparation.outputs.rc_tag }}
+      push: true
+    secrets: inherit
+
+  quality_checks:
+    uses: ./.github/workflows/quality-checks.yml
+
+  build-test:
+    needs: [
+      build_images,
+      quality_checks
+    ]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report CI status
+        shell: bash
+        env:
+          CI_SUCCESS: ${{ !contains(needs.*.result, 'failure') }}
+        run: |
+          if [ "${CI_SUCCESS}" == "true" ]
+          then
+            echo 'Build and Quality Checks completed ✓'
+          else
+            echo 'Build and Quality Checks failed ✗'
+            exit 1
+          fi
