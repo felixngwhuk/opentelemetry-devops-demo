@@ -1,0 +1,205 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: accounting
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ad
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currency
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: email
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flagd-ui
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-detection
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-proxy
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-provider
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-catalog
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quote
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendation
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping
+  labels:
+    app.kubernetes.io/version: 0.0.0
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/version: 0.0.0
