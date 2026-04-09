@@ -1,1 +1,2 @@
 kubernetes/opentelemetry-demo.yaml
+kubernetes/base/opentelemetry-demo.yaml
