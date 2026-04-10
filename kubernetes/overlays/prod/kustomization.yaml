@@ -49,3 +49,9 @@ patches:
   - path: replicas.yaml
   - path: resources.yaml
   - path: version-labels.yaml
+  - target:
+      group: traefik.io
+      version: v1alpha1
+      kind: IngressRoute
+      name: frontend-proxy
+    path: traefik-host-patch.yaml
