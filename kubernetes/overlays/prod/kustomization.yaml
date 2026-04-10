@@ -45,7 +45,7 @@ images:
   - name: ghcr.io/felixngwhuk/opentelemetry-devops-demo/shipping
     newTag: 0.0.0
 
-patchesStrategicMerge:
-  - replicas.yaml
-  - resources.yaml
-  - version-labels.yaml
+patches:
+  - path: replicas.yaml
+  - path: resources.yaml
+  - path: version-labels.yaml
