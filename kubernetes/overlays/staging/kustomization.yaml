@@ -48,4 +48,15 @@ images:
 patches:
   - path: replicas.yaml
   - path: resources.yaml
-  - path: version-labels.yaml
+  - target:
+      labelSelector: app.kubernetes.io/part-of=opentelemetry-demo
+    patch: |-
+      - op: add
+        path: /metadata/labels/app.kubernetes.io~1version
+        value: 0.0.0-rc-placeholder
+  - target:
+      group: traefik.io
+      version: v1alpha1
+      kind: IngressRoute
+      name: frontend-proxy
+    path: traefik-host-patch.yaml
