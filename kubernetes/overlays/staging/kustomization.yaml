@@ -55,6 +55,12 @@ patches:
         path: /metadata/labels/app.kubernetes.io~1version
         value: 0.0.0-rc-placeholder
   - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRoleBinding
+      labelSelector: rbac.opentelemetry.io/binding=otel-collector
+    path: clusterrolebinding-patch.yaml
+  - target:
       group: traefik.io
       version: v1alpha1
       kind: IngressRoute
