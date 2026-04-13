@@ -845,52 +845,11 @@ data:
 # Phase 1: commented out optional Grafana ClusterRole
 # Source: opentelemetry-demo/charts/grafana/templates/clusterrole.yaml
 ---
-# Source: opentelemetry-demo/charts/opentelemetry-collector/templates/clusterrole.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: otel-collector
-  labels:
-    app.kubernetes.io/name: opentelemetry-collector
-    app.kubernetes.io/instance: opentelemetry-demo
-    app.kubernetes.io/version: "0.135.0"
-    app.kubernetes.io/part-of: opentelemetry-collector
-    app.kubernetes.io/component: standalone-collector
-rules:
-  - apiGroups: [""]
-    resources: ["pods", "namespaces"]
-    verbs: ["get", "watch", "list"]
-  - apiGroups: ["apps"]
-    resources: ["replicasets"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["extensions"]
-    resources: ["replicasets"]
-    verbs: ["get", "list", "watch"]
----
 # Phase 1: commented out optional Prometheus ClusterRole
 # Source: opentelemetry-demo/charts/prometheus/templates/clusterrole.yaml
 ---
 # Phase 1: commented out optional Grafana ClusterRoleBinding
 # Source: opentelemetry-demo/charts/grafana/templates/clusterrolebinding.yaml
----
-# Source: opentelemetry-demo/charts/opentelemetry-collector/templates/clusterrolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: otel-collector
-  labels:
-    app.kubernetes.io/name: opentelemetry-collector
-    app.kubernetes.io/instance: opentelemetry-demo
-    app.kubernetes.io/version: "0.135.0"
-    app.kubernetes.io/part-of: opentelemetry-collector
-    app.kubernetes.io/component: standalone-collector
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: otel-collector
-subjects:
-- kind: ServiceAccount
-  name: otel-collector
 ---
 # Phase 1: commented out optional Prometheus ClusterRoleBinding
 # Source: opentelemetry-demo/charts/prometheus/templates/clusterrolebinding.yaml
