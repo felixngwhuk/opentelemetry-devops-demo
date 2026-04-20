@@ -1,0 +1,61 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+name: Update GitOps
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitOps overlay environment to update
+        required: true
+        type: string
+      image_tag:
+        description: Image tag to write into the GitOps kustomization
+        required: true
+        type: string
+    secrets:
+      gitops_repo_token:
+        description: Token with write access to the GitOps repository
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  update-gitops:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      KUSTOMIZATION_FILE: apps/opentelemetry-demo/overlays/${{ inputs.environment }}/kustomization.yaml
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: felixngwhuk/opentelemetry-devops-demo-gitops
+          token: ${{ secrets.gitops_repo_token }}
+          path: gitops
+
+      - name: Update ${{ inputs.environment }} image tags
+        shell: bash
+        run: |
+          # Update every images[].newTag entry in the selected environment overlay.
+          perl -0pi -e 's/(newTag: )[^\n]+/${1}$ENV{IMAGE_TAG}/g' "gitops/${KUSTOMIZATION_FILE}"
+
+          # Update the app.kubernetes.io/version label patch for all OpenTelemetry Demo resources.
+          perl -0pi -e 's/(labelSelector: app\.kubernetes\.io\/part-of=opentelemetry-demo\n    patch: \|-\n      - op: add\n        path: \/metadata\/labels\/app\.kubernetes\.io~1version\n        value: )[^\n]+/${1}$ENV{IMAGE_TAG}/' "gitops/${KUSTOMIZATION_FILE}"
+
+          git -C gitops diff -- "${KUSTOMIZATION_FILE}"
+
+      - name: Commit and push GitOps update
+        shell: bash
+        run: |
+          if git -C gitops diff --quiet -- "${KUSTOMIZATION_FILE}"; then
+            echo "No GitOps changes detected for ${IMAGE_TAG}"
+            exit 0
+          fi
+
+          git -C gitops config user.name "github-actions[bot]"
+          git -C gitops config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C gitops add "${KUSTOMIZATION_FILE}"
+          git -C gitops commit -m "Update ${{ inputs.environment }} image tag to ${IMAGE_TAG}"
+          git -C gitops push
