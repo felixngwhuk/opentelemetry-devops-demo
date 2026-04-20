@@ -16,7 +16,7 @@ jobs:
   build_preparation:
     outputs:
       dev_tag: ${{ steps.set_image_vars.outputs.dev_tag }}
-      rc_tag: ${{ steps.set_image_vars.outputs.rc_tag }}
+      image_tag: ${{ steps.set_image_vars.outputs.image_tag }}
     runs-on: ubuntu-latest
     steps:
       - name: Validate release branch format
@@ -46,7 +46,7 @@ jobs:
           RC_TAG="${VERSION}-rc-${SHORT_SHA}"
 
           echo "dev_tag=$DEV_TAG" >> "$GITHUB_OUTPUT"
-          echo "rc_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$RC_TAG" >> "$GITHUB_OUTPUT"
 
   build_images:
     needs: build_preparation
@@ -56,7 +56,7 @@ jobs:
     uses: ./.github/workflows/component-build-images.yml
     with:
       promoted_from_version: ${{ needs.build_preparation.outputs.dev_tag }}
-      version: ${{ needs.build_preparation.outputs.rc_tag }}
+      version: ${{ needs.build_preparation.outputs.image_tag }}
       push: true
     secrets: inherit
 
@@ -83,3 +83,15 @@ jobs:
             echo 'Build and Quality Checks failed ✗'
             exit 1
           fi
+
+  update-gitops:
+    needs: [
+      build_preparation,
+      build-test
+    ]
+    uses: ./.github/workflows/update-gitops.yml
+    with:
+      environment: staging
+      image_tag: ${{ needs.build_preparation.outputs.image_tag }}
+    secrets:
+      gitops_repo_token: ${{ secrets.GITOPS_REPO_TOKEN }}

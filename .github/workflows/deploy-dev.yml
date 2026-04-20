@@ -60,3 +60,15 @@ jobs:
             echo 'Build and Quality Checks failed ✗'
             exit 1
           fi
+
+  update-gitops:
+    needs: [
+      build_preparation,
+      build-test
+    ]
+    uses: ./.github/workflows/update-gitops.yml
+    with:
+      environment: dev
+      image_tag: ${{ needs.build_preparation.outputs.image_tag }}
+    secrets:
+      gitops_repo_token: ${{ secrets.GITOPS_REPO_TOKEN }}
