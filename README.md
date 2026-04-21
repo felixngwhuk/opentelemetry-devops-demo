@@ -1,9 +1,206 @@
-# Note
+# Web App Project Notes
 
-This project is a fork of `opentelemetry-demo`.
-Thanks to the team and contributors for opensourcing this wonderful
-demo project.
-I use it to demonstrate DevOps related skills only.
+This repository is a fork of [`open-telemetry/opentelemetry-demo`](https://github.com/open-telemetry/opentelemetry-demo).
+
+I use the upstream application as a realistic multi-service workload, but the main purpose of this repository is to show how I package, build, version, and promote a containerised application through a GitOps-based delivery flow. The application itself is not heavily rewritten; the emphasis is on the delivery model around it.
+
+## How this repository fits into the full portfolio
+
+The portfolio is split into three repositories so that infrastructure, application delivery, and cluster state are kept separate:
+
+- **Infra** – AWS networking, EKS, and cluster bootstrap  
+  <https://github.com/felixngwhuk/opentelemetry-devops-demo-infra>
+- **Web app** – application source code and container image build logic  
+  <https://github.com/felixngwhuk/opentelemetry-devops-demo>
+- **GitOps** – Argo CD application definitions and deployment manifests  
+  <https://github.com/felixngwhuk/opentelemetry-devops-demo-gitops>
+
+I chose this split because each repository has a different lifecycle:
+
+- infrastructure changes are slower and need a different review path
+- application code changes happen more frequently
+- deployment state should be visible and auditable in GitOps without mixing it with build logic
+
+## Skills demonstrated by this repository
+
+- GitHub Actions workflow design for pull requests, environment promotion, and release tagging
+- Trunk-based development with release branches and semantic version tags
+- Container image build, versioning, and promotion in GitHub Container Registry
+- Separation of CI responsibilities in the application repository and CD responsibilities in a GitOps repository
+- GitOps delivery with Argo CD as the deployment reconciler
+- Domain-based ingress design for an EKS-hosted application exposed through Route 53, AWS load balancing, and Traefik
+
+## What changed from upstream and why
+
+Compared with the upstream demo, the main changes in this repository are around delivery and packaging rather than business features.
+
+### 1. CI/CD was reshaped around environment promotion
+
+The upstream project already includes its own workflows, but this fork replaces that release flow with a branch and tag model that matches how I wanted to demonstrate environment promotion.
+
+Custom workflows added in this repository:
+
+- `.github/workflows/ci-pr.yml`
+- `.github/workflows/deploy-dev.yml`
+- `.github/workflows/deploy-staging.yml`
+- `.github/workflows/deploy-prod.yml`
+- `.github/workflows/quality-checks.yml`
+- `.github/workflows/update-gitops.yml`
+
+Several upstream workflows were moved into `.github/workflows-disabled/` instead of being kept active. I chose that approach so the original automation is still visible for reference, while making it clear which workflows belong to this portfolio design.
+
+### 2. The repository now uses a trunk-based flow with release branches
+
+The deployment flow is:
+
+- **Pull request to `main`**: build and test only
+- **Merge to `main`**: build images and update the **dev** deployment state in the GitOps repository
+- **Push to `version/*`**: promote/build images for **staging**
+- **Push a semantic version tag**: promote/build images for **production**
+
+I chose this model because it shows a clear path from integration to release without making the demo depend on manual image editing. It also gives each environment a predictable trigger:
+
+- `main` acts as the active development trunk
+- `version/*` branches act as release preparation branches
+- semantic version tags act as the production release marker
+
+### 3. Image naming was changed to one repository per service in GHCR
+
+A large part of the diff is the move from upstream image tags such as:
+
+- `ghcr.io/open-telemetry/demo:<version>-frontend`
+
+to service-specific repositories such as:
+
+- `ghcr.io/felixngwhuk/opentelemetry-devops-demo/frontend:<tag>`
+
+This change appears across:
+
+- `.env`
+- `docker-compose.yml`
+- `docker-compose.minimal.yml`
+- `docker-compose-tests.yml`
+- `.github/workflows/component-build-images.yml`
+
+I chose one image repository per service because it makes image ownership and promotion easier to reason about in GitOps. In particular, it simplifies:
+
+- per-service image references in deployment state
+- retagging or promoting a single service image if needed
+- browsing package history in GHCR
+- keeping the image name aligned with the service name
+
+### 4. Build workflows support promotion as well as rebuild
+
+`.github/workflows/component-build-images.yml` was changed so a workflow can either:
+
+- build an image from source, or
+- promote an existing image by retagging it in GHCR
+
+The staging and production workflows use this to promote images forward when a prior tag already exists.
+
+I chose this because it demonstrates an important delivery idea: later environments do not always need a fresh rebuild. Promoting the same artifact forward makes it easier to say what was actually tested in the earlier environment.
+
+### 5. GitOps handoff is done by updating a separate repository
+
+This repository does not perform direct cluster deployment in CD. Instead, the GitHub Actions pipeline updates the GitOps repository through `.github/workflows/update-gitops.yml`.
+
+That workflow updates the target environment in the GitOps repository by changing the image tags and version metadata that Argo CD watches.
+
+I chose this approach because it keeps deployment intent in the GitOps repository, where Argo CD can reconcile it. The web app repository remains responsible for producing versioned artifacts; the GitOps repository remains responsible for desired cluster state.
+
+## Delivery flow
+
+### Pull request checks
+
+When a pull request targets `main`, the pipeline runs:
+
+- image build validation without pushing
+- quality checks
+- an overall pass/fail gate
+
+The quality workflow currently includes:
+
+- markdown linting
+- YAML linting
+- spelling checks
+- link checks
+- a repository sanity check
+- licence checks
+
+I chose to keep PR checks focused on buildability and repository quality first. For this project, that gives fast feedback before any environment promotion happens.
+
+### Dev deployment
+
+When code is merged to `main`:
+
+1. a short SHA-based image tag is created in the form `dev-<sha>`
+2. images are built and pushed to GHCR
+3. the dev deployment state in the GitOps repository is updated
+
+I chose SHA-based dev tags because they are easy to trace back to a commit and work well for frequent integration changes.
+
+### Staging deployment
+
+When code is pushed to `version/*`:
+
+1. the branch name is validated as a release branch
+2. `VERSION_PATCH_NUMBER` is read
+3. an RC-style tag is created in the form `<major>.<minor>.<patch>-rc-<sha>`
+4. images are promoted or built
+5. the staging deployment state in the GitOps repository is updated
+
+I chose this because it makes staging look like release preparation rather than just another copy of dev.
+
+### Production deployment
+
+When a semantic version tag is pushed:
+
+1. the tag format is validated
+2. the tag patch number is checked against `VERSION_PATCH_NUMBER`
+3. images are promoted or built as the release tag
+4. the production deployment state in the GitOps repository is updated
+
+I chose this because it makes the production release explicit and auditable. The version tag becomes the release marker rather than an informal branch state.
+
+## GitOps and runtime design
+
+This repository is responsible for:
+
+- application source
+- Docker build inputs
+- image versioning
+- CI checks
+- GitHub Actions automation that updates deployment state
+
+The GitOps repository is responsible for:
+
+- Argo CD application definitions
+- deployment manifests used for CD
+- environment state stored as desired configuration
+
+Argo CD watches the GitOps repository and reconciles the EKS cluster to match that declared state. I chose this split so image production and cluster reconciliation stay as separate steps with a clear audit trail.
+
+At runtime, the deployed application follows this path:
+
+`Route 53 -> AWS load balancer -> Traefik in EKS -> application service`
+
+TLS certificates are issued by AWS ACM. TLS is terminated at the AWS load balancer, and Traefik then routes the request internally over HTTP according to the host and routing rules.
+
+Environment access is exposed with domain-based routing:
+
+- `dev.devopsbyfelix.shop`
+- `staging.devopsbyfelix.shop`
+- `www.devopsbyfelix.shop`
+
+I chose this layout because it keeps certificate handling at the AWS edge while leaving in-cluster routing to Traefik. That separation keeps the public entrypoint and Kubernetes routing concerns distinct.
+
+- GitHub Actions workflows for PR, dev, staging, and production flows
+- a reusable GitOps update workflow
+- one-image-repository-per-service naming in GHCR
+- environment promotion using branches and semantic version tags
+- a delivery model where Argo CD deploys from the separate GitOps repository rather than from this repository directly
+
+The upstream OpenTelemetry Demo content remains below for application-specific usage and component details.
 
 <!-- markdownlint-disable-next-line -->
 # <img src="https://opentelemetry.io/img/logos/opentelemetry-logo-nav.png" alt="OTel logo" width="45"> OpenTelemetry Demo
