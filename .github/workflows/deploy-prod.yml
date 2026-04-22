@@ -18,6 +18,8 @@ jobs:
       image_tag: ${{ steps.set_image_vars.outputs.image_tag }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
       - name: Validate version tag format
         shell: bash
         run: |
