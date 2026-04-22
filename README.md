@@ -14,11 +14,11 @@ emphasis is on the delivery model around it.
 The portfolio is split into three repositories so that infrastructure,
 application delivery, and cluster state are kept separate:
 
-- **Infra** - AWS networking, EKS, and cluster bootstrap  
+- **Infra** - AWS networking, EKS, and cluster bootstrap
   <https://github.com/felixngwhuk/opentelemetry-devops-demo-infra>
-- **Web app** - application source code and container image build logic  
+- **Web app** - application source code and container image build logic
   <https://github.com/felixngwhuk/opentelemetry-devops-demo>
-- **GitOps** - Argo CD application definitions and deployment manifests  
+- **GitOps** - Argo CD application definitions and deployment manifests
   <https://github.com/felixngwhuk/opentelemetry-devops-demo-gitops>
 
 I chose this split because each repository has a different lifecycle:
