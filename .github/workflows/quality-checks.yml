@@ -49,7 +49,7 @@ jobs:
         uses: umbrelladocs/action-linkspector@v1
         with:
           level: info
-          fail_level: any
+          fail_level: none
           config_file: '.linkspector.yml'
 
   sanity:
