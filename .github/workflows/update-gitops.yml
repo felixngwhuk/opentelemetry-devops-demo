@@ -27,6 +27,9 @@ jobs:
     env:
       IMAGE_TAG: ${{ inputs.image_tag }}
       KUSTOMIZATION_FILE: apps/opentelemetry-demo/overlays/${{ inputs.environment }}/kustomization.yaml
+      APP_IMAGE_PREFIX: ghcr.io/felixngwhuk/opentelemetry-devops-demo/
+      VERSION_LABEL_SELECTOR: app.kubernetes.io/part-of=opentelemetry-demo
+      VERSION_LABEL_PATH: /metadata/labels/app.kubernetes.io~1version
     steps:
       - name: Checkout GitOps repository
         uses: actions/checkout@v6.0.2
@@ -35,15 +38,48 @@ jobs:
           token: ${{ secrets.gitops_repo_token }}
           path: gitops
 
+      - name: Validate ${{ inputs.environment }} kustomization targets
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            test "$(yq '[.images[] | select(.name | startswith(strenv(APP_IMAGE_PREFIX)))] | length' "gitops/${KUSTOMIZATION_FILE}")" -gt 0
+            test "$(yq '[.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
+            test "$(yq '[.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(VERSION_LABEL_PATH))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
+
       - name: Update ${{ inputs.environment }} image tags
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            yq -i '
+              (.images[]
+                | select(.name | startswith(strenv(APP_IMAGE_PREFIX)))
+                | .newTag) = strenv(IMAGE_TAG)
+              |
+              (.patches[]
+                | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR))
+                | .patch) |= (
+                  from_yaml
+                  | map(
+                      if .path == strenv(VERSION_LABEL_PATH) then
+                        .value = strenv(IMAGE_TAG)
+                      else
+                        .
+                      end
+                    )
+                  | to_yaml
+                )
+            ' "gitops/${KUSTOMIZATION_FILE}"
+
+      - name: Verify ${{ inputs.environment }} kustomization update
+        uses: mikefarah/yq@master
+        with:
+          cmd: |
+            test "$(yq '[.images[] | select((.name | startswith(strenv(APP_IMAGE_PREFIX))) and .newTag != strenv(IMAGE_TAG))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 0
+            test "$(yq '(.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(VERSION_LABEL_PATH)) | .value)' "gitops/${KUSTOMIZATION_FILE}")" = "${IMAGE_TAG}"
+
+      - name: Show GitOps diff
         shell: bash
         run: |
-          # Update every images[].newTag entry in the selected environment overlay.
-          perl -0pi -e 's/(newTag: )[^\n]+/${1}$ENV{IMAGE_TAG}/g' "gitops/${KUSTOMIZATION_FILE}"
-
-          # Update the app.kubernetes.io/version label patch for all OpenTelemetry Demo resources.
-          perl -0pi -e 's/(labelSelector: app\.kubernetes\.io\/part-of=opentelemetry-demo\n    patch: \|-\n      - op: add\n        path: \/metadata\/labels\/app\.kubernetes\.io~1version\n        value: )[^\n]+/${1}$ENV{IMAGE_TAG}/' "gitops/${KUSTOMIZATION_FILE}"
-
           git -C gitops diff -- "${KUSTOMIZATION_FILE}"
 
       - name: Commit and push GitOps update
