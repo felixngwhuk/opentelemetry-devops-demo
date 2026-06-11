@@ -85,6 +85,45 @@ gives each environment a predictable trigger:
 - `version/*` branches act as release preparation branches
 - semantic version tags act as the production release marker
 
+**Branch and workflow trigger diagram**
+
+```mermaid
+%%{init: {"theme": "base", "gitGraph": {"mainBranchOrder": 2, "showCommitLabel": true, "rotateCommitLabel": true}} }%%
+gitGraph LR:
+  commit id: "main starts"
+
+  branch "feature/add-cart-observability" order: 1
+  checkout "feature/add-cart-observability"
+  commit id: "feature work 1"
+  commit id: "feature work 2"
+  commit id: "feature work 3 (PR Check)"
+
+
+  checkout main
+  merge "feature/add-cart-observability" id: "feature merge main (deploy DEV)"
+
+  commit id: "new version branch (deploy STAGING)"
+
+  branch "version/0.1" order: 4
+  checkout "version/0.1"
+  commit id: "tag v.0.1.0 (Deploy PROD)" tag: "v.0.1.0"
+
+  checkout main
+  branch "bugfix/fix-frontend-routing" order: 3
+  checkout "bugfix/fix-frontend-routing"
+  commit id: "bug fix"
+
+  checkout main
+  merge "bugfix/fix-frontend-routing" id: "bugfix merge main (deploy DEV)"
+
+  checkout "version/0.1"
+  merge "bugfix/fix-frontend-routing" id: "bugfix cherry pick (deploy STAGING)"
+  commit id: "tag v.0.1.1 (Deploy PROD)" tag: "v.0.1.1"
+
+  checkout main
+  commit id: "next trunk change"
+```
+
 ### 3. Image naming was changed to one repository per service in GHCR
 
 A large part of the diff is the move from upstream image tags such as:
