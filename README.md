@@ -85,7 +85,7 @@ gives each environment a predictable trigger:
 - `version/*` branches act as release preparation branches
 - semantic version tags act as the production release marker
 
-**Branch and workflow trigger diagram**
+#### Branch and workflow trigger diagram
 
 ```mermaid
 %%{init: {"theme": "base", "gitGraph": {"mainBranchOrder": 2, "showCommitLabel": true, "rotateCommitLabel": true}} }%%
