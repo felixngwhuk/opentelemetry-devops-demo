@@ -59,13 +59,7 @@ jobs:
                 | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR))
                 | .patch) |= (
                   from_yaml
-                  | map(
-                      if .path == strenv(VERSION_LABEL_PATH) then
-                        .value = strenv(IMAGE_TAG)
-                      else
-                        .
-                      end
-                    )
+                  | with(.[] | select(.path == strenv(VERSION_LABEL_PATH)); .value = strenv(IMAGE_TAG))
                   | to_yaml
                 )
             ' "gitops/${KUSTOMIZATION_FILE}"
