@@ -27,7 +27,7 @@ jobs:
     env:
       IMAGE_TAG: ${{ inputs.image_tag }}
       KUSTOMIZATION_FILE: apps/opentelemetry-demo/overlays/${{ inputs.environment }}/kustomization.yaml
-      APP_IMAGE_PREFIX: ghcr.io/felixngwhuk/opentelemetry-devops-demo/
+      APP_IMAGE_NAME_REGEX: ^ghcr[.]io/felixngwhuk/opentelemetry-devops-demo/
       VERSION_LABEL_SELECTOR: app.kubernetes.io/part-of=opentelemetry-demo
       VERSION_LABEL_PATH: /metadata/labels/app.kubernetes.io~1version
     steps:
@@ -42,7 +42,7 @@ jobs:
         uses: mikefarah/yq@master
         with:
           cmd: |
-            test "$(yq '[.images[] | select(.name | startswith(strenv(APP_IMAGE_PREFIX)))] | length' "gitops/${KUSTOMIZATION_FILE}")" -gt 0
+            test "$(yq '[.images[] | select(.name | test(strenv(APP_IMAGE_NAME_REGEX)))] | length' "gitops/${KUSTOMIZATION_FILE}")" -gt 0
             test "$(yq '[.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
             test "$(yq '[.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(VERSION_LABEL_PATH))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
 
@@ -52,7 +52,7 @@ jobs:
           cmd: |
             yq -i '
               (.images[]
-                | select(.name | startswith(strenv(APP_IMAGE_PREFIX)))
+                | select(.name | test(strenv(APP_IMAGE_NAME_REGEX)))
                 | .newTag) = strenv(IMAGE_TAG)
               |
               (.patches[]
@@ -74,7 +74,7 @@ jobs:
         uses: mikefarah/yq@master
         with:
           cmd: |
-            test "$(yq '[.images[] | select((.name | startswith(strenv(APP_IMAGE_PREFIX))) and .newTag != strenv(IMAGE_TAG))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 0
+            test "$(yq '[.images[] | select((.name | test(strenv(APP_IMAGE_NAME_REGEX))) and .newTag != strenv(IMAGE_TAG))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 0
             test "$(yq '(.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(VERSION_LABEL_PATH)) | .value)' "gitops/${KUSTOMIZATION_FILE}")" = "${IMAGE_TAG}"
 
       - name: Show GitOps diff
