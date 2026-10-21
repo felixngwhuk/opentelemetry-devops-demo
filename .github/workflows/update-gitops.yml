@@ -25,11 +25,14 @@ jobs:
   update-gitops:
     runs-on: ubuntu-latest
     env:
+      RELEASE_ENVIRONMENT: ${{ inputs.environment }}
       IMAGE_TAG: ${{ inputs.image_tag }}
       KUSTOMIZATION_FILE: apps/opentelemetry-demo/overlays/${{ inputs.environment }}/kustomization.yaml
       APP_IMAGE_NAME_REGEX: ^ghcr[.]io/felixngwhuk/opentelemetry-devops-demo/
       VERSION_LABEL_SELECTOR: app.kubernetes.io/part-of=opentelemetry-demo
       VERSION_LABEL_PATH: /metadata/labels/app.kubernetes.io~1version
+      POD_VERSION_LABEL_SELECTOR: platform.devopsbyfelix.shop/release-managed=true
+      POD_VERSION_LABEL_PATH: /spec/template/metadata/labels/app.kubernetes.io~1version
     steps:
       - name: Checkout GitOps repository
         uses: actions/checkout@v6.0.2
@@ -39,17 +42,42 @@ jobs:
           path: gitops
 
       - name: Validate ${{ inputs.environment }} kustomization targets
-        uses: mikefarah/yq@master
+        # The upstream action tag uses a floating image; pin the container itself.
+        # Actions exposes with.cmd as INPUT_CMD for the shell entrypoint.
+        uses: docker://mikefarah/yq:4.44.3-githubaction
         with:
+          entrypoint: /bin/sh
+          args: -ec "eval \"$INPUT_CMD\""
           cmd: |
+            set -eu
+            case "$RELEASE_ENVIRONMENT" in
+              dev) TAG_PATTERN='^dev-[0-9a-f]{7}$' ;;
+              staging) TAG_PATTERN='^[0-9]+[.][0-9]+[.][0-9]+-rc-[0-9a-f]{7}$' ;;
+              prod) TAG_PATTERN='^[0-9]+[.][0-9]+[.][0-9]+$' ;;
+              *) echo "Unknown environment: $RELEASE_ENVIRONMENT" >&2; exit 1 ;;
+            esac
+            export TAG_PATTERN
+            yq -n -e '(strenv(IMAGE_TAG) | test(strenv(TAG_PATTERN))) and (strenv(IMAGE_TAG) | length <= 128)' >/dev/null
+            test "$(yq ea '[.] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
             test "$(yq '[.images[] | select(.name | test(strenv(APP_IMAGE_NAME_REGEX)))] | length' "gitops/${KUSTOMIZATION_FILE}")" -gt 0
-            test "$(yq '[.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
-            test "$(yq '[.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(VERSION_LABEL_PATH))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
+            yq -e '(.images | length) == ([.images[].name] | unique | length)' "gitops/${KUSTOMIZATION_FILE}" >/dev/null
+            for SELECTOR in "$VERSION_LABEL_SELECTOR" "$POD_VERSION_LABEL_SELECTOR"; do
+              LABEL_PATH=$VERSION_LABEL_PATH
+              test "$SELECTOR" != "$POD_VERSION_LABEL_SELECTOR" || LABEL_PATH=$POD_VERSION_LABEL_PATH
+              export SELECTOR LABEL_PATH
+              test "$(yq '[.patches[] | select(.target.labelSelector == strenv(SELECTOR))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
+              test "$(yq '[.patches[] | select(.target.labelSelector == strenv(SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(LABEL_PATH))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 1
+              yq -e '.patches[] | select(.target.labelSelector == strenv(SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(LABEL_PATH)) | ((.op == "add" or .op == "replace") and (.value | tag == "!!str"))' "gitops/${KUSTOMIZATION_FILE}" >/dev/null
+            done
+            yq -e '.patches[] | select(.target.labelSelector == strenv(POD_VERSION_LABEL_SELECTOR)) | .target | ((keys | length) == 4 and .group == "apps" and .version == "v1" and .kind == "Deployment")' "gitops/${KUSTOMIZATION_FILE}" >/dev/null
 
       - name: Update ${{ inputs.environment }} image tags
-        uses: mikefarah/yq@master
+        uses: docker://mikefarah/yq:4.44.3-githubaction
         with:
+          entrypoint: /bin/sh
+          args: -ec "eval \"$INPUT_CMD\""
           cmd: |
+            set -eu
             yq -i '
               (.images[]
                 | select(.name | test(strenv(APP_IMAGE_NAME_REGEX)))
@@ -62,14 +90,30 @@ jobs:
                   | with(.[] | select(.path == strenv(VERSION_LABEL_PATH)); .value = strenv(IMAGE_TAG))
                   | to_yaml
                 )
+              |
+              (.patches[]
+                | select(.target.labelSelector == strenv(POD_VERSION_LABEL_SELECTOR))
+                | .patch) |= (
+                  from_yaml
+                  | with(.[] | select(.path == strenv(POD_VERSION_LABEL_PATH)); .value = strenv(IMAGE_TAG))
+                  | to_yaml
+                )
             ' "gitops/${KUSTOMIZATION_FILE}"
 
       - name: Verify ${{ inputs.environment }} kustomization update
-        uses: mikefarah/yq@master
+        uses: docker://mikefarah/yq:4.44.3-githubaction
         with:
+          entrypoint: /bin/sh
+          args: -ec "eval \"$INPUT_CMD\""
           cmd: |
+            set -eu
             test "$(yq '[.images[] | select((.name | test(strenv(APP_IMAGE_NAME_REGEX))) and .newTag != strenv(IMAGE_TAG))] | length' "gitops/${KUSTOMIZATION_FILE}")" -eq 0
-            test "$(yq '(.patches[] | select(.target.labelSelector == strenv(VERSION_LABEL_SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(VERSION_LABEL_PATH)) | .value)' "gitops/${KUSTOMIZATION_FILE}")" = "${IMAGE_TAG}"
+            for SELECTOR in "$VERSION_LABEL_SELECTOR" "$POD_VERSION_LABEL_SELECTOR"; do
+              LABEL_PATH=$VERSION_LABEL_PATH
+              test "$SELECTOR" != "$POD_VERSION_LABEL_SELECTOR" || LABEL_PATH=$POD_VERSION_LABEL_PATH
+              export SELECTOR LABEL_PATH
+              test "$(yq '.patches[] | select(.target.labelSelector == strenv(SELECTOR)) | .patch | from_yaml | .[] | select(.path == strenv(LABEL_PATH)) | .value' "gitops/${KUSTOMIZATION_FILE}")" = "$IMAGE_TAG"
+            done
 
       - name: Show GitOps diff
         shell: bash
@@ -87,5 +131,5 @@ jobs:
           git -C gitops config user.name "github-actions[bot]"
           git -C gitops config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git -C gitops add "${KUSTOMIZATION_FILE}"
-          git -C gitops commit -m "Update ${{ inputs.environment }} image tag to ${IMAGE_TAG}"
+          git -C gitops commit -m "Update ${RELEASE_ENVIRONMENT} image tag to ${IMAGE_TAG}"
           git -C gitops push
